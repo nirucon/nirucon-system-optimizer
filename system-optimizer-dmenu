@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Script: nirucon-system-optimizer by Nicklas Rudolfsson
+# Script: system-optimizer-dmenu by Nicklas Rudolfsson
 # https://github.com/nirucon
 # Description: A dmenu script to optimize a Linux system (Arch, Void, Debian based)
 # WARNING: Storing the sudo password in a variable is insecure and can be intercepted. Use this method only in trusted environments!
