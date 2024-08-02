@@ -1,0 +1,301 @@
+#!/bin/bash
+
+# Script: nirucon-system-optimizer by Nicklas Rudolfsson
+# https://github.com/nirucon
+# Description: A dmenu script to optimize a Linux system (Arch, Void, Debian based)
+# WARNING: Storing the sudo password in a variable is insecure and can be intercepted. Use this method only in trusted environments!
+
+# Log file
+LOGFILE="/tmp/nirucon-system-optimizer.log"
+exec > >(tee -a "$LOGFILE") 2>&1
+
+# Prompt for sudo password
+get_sudo_password() {
+    SUDO_PASSWORD=$(echo -n | dmenu -p "Enter sudo password: " -fn 'Monospace-20' -nb '#000000' -nf '#FFFFFF' -sb '#3a3d3f' -sf '#FFFFFF')
+    export SUDO_PASSWORD
+}
+
+# Run a command with sudo and password
+run_sudo() {
+    echo "$SUDO_PASSWORD" | sudo -S "$@"
+}
+
+# Determine which AUR helper is installed (yay or paru)
+if command -v yay &> /dev/null; then
+    AUR_HELPER="yay"
+elif command -v paru &> /dev/null; then
+    AUR_HELPER="paru"
+else
+    AUR_HELPER=""
+fi
+
+# Function to send notifications
+notify() {
+    local title="$1"
+    local message="$2"
+    if ! notify-send -u normal -i dialog-information "$title" "$message"; then
+        echo "Failed to send notification: $title - $message"
+    fi
+}
+
+# Function to send error notifications
+notify_error() {
+    local title="$1"
+    local message="$2"
+    if ! notify-send -u critical -i dialog-error "$title" "$message"; then
+        echo "Failed to send error notification: $title - $message"
+    fi
+}
+
+# Check if required tools are installed
+dependencies=("dmenu" "notify-send" "fsck")
+if command -v pacman &> /dev/null; then
+    dependencies+=("reflector" "paccache")
+fi
+for dep in "${dependencies[@]}"; do
+    if ! command -v $dep &> /dev/null; then
+        notify_error "Missing Dependency" "Please install $dep"
+        exit 1
+    fi
+done
+
+# Prompt for sudo password at the start
+get_sudo_password
+
+# Function to update system
+update_system() {
+    notify "Update System" "Update System started..."
+    echo "Updating system..."
+    if command -v pacman &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S pacman -Syu --noconfirm; then
+            if [ -n "$AUR_HELPER" ]; then
+                $AUR_HELPER -Syu --noconfirm
+            fi
+            notify "Update System" "Update System done!"
+        else
+            notify_error "Update System" "Update System failed!"
+        fi
+    elif command -v xbps-install &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S xbps-install -Suv; then
+            notify "Update System" "Update System done!"
+        else
+            notify_error "Update System" "Update System failed!"
+        fi
+    elif command -v apt &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S apt update && echo "$SUDO_PASSWORD" | sudo -S apt upgrade -y; then
+            notify "Update System" "Update System done!"
+        else
+            notify_error "Update System" "Update System failed!"
+        fi
+    fi
+}
+
+# Function to clean package cache
+clean_package_cache() {
+    notify "Clean Package Cache" "Clean Package Cache started..."
+    echo "Cleaning package cache..."
+    if command -v pacman &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S pacman -Sc --noconfirm; then
+            if [ -n "$AUR_HELPER" ]; then
+                $AUR_HELPER -Sc --noconfirm
+            fi
+            notify "Clean Package Cache" "Clean Package Cache done!"
+        else
+            notify_error "Clean Package Cache" "Cleaning package cache failed!"
+        fi
+    elif command -v xbps-remove &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S xbps-remove -O; then
+            notify "Clean Package Cache" "Clean Package Cache done!"
+        else
+            notify_error "Clean Package Cache" "Cleaning package cache failed!"
+        fi
+    elif command -v apt-get &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S apt-get clean; then
+            notify "Clean Package Cache" "Clean Package Cache done!"
+        else
+            notify_error "Clean Package Cache" "Cleaning package cache failed!"
+        fi
+    fi
+}
+
+# Function to remove orphan packages
+remove_orphans() {
+    notify "Remove Orphans" "Remove Orphans started..."
+    echo "Removing orphan packages..."
+    if command -v pacman &> /dev/null; then
+        if orphans=$(pacman -Qdtq) && [ -n "$orphans" ]; then
+            if echo "$SUDO_PASSWORD" | sudo -S pacman -Rns $orphans --noconfirm; then
+                if [ -n "$AUR_HELPER" ]; then
+                    $AUR_HELPER -Rns $orphans --noconfirm
+                fi
+                notify "Remove Orphans" "Remove Orphans done!"
+            else
+                notify_error "Remove Orphans" "Removing orphan packages failed!"
+            fi
+        else
+            notify "Remove Orphans" "No orphan packages found!"
+        fi
+    elif command -v xbps-remove &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S xbps-remove -o; then
+            notify "Remove Orphans" "Remove Orphans done!"
+        else
+            notify_error "Remove Orphans" "Removing orphan packages failed!"
+        fi
+    elif command -v apt-get &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S apt-get autoremove -y; then
+            notify "Remove Orphans" "Remove Orphans done!"
+        else
+            notify_error "Remove Orphans" "Removing orphan packages failed!"
+        fi
+    fi
+}
+
+# Function to clean unused package cache
+clean_unused_package_cache() {
+    notify "Clean Unused Package Cache" "Clean Unused Package Cache started..."
+    echo "Cleaning unused package cache..."
+    if command -v paccache &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S paccache -r; then
+            notify "Clean Unused Package Cache" "Clean Unused Package Cache done!"
+        else
+            notify_error "Clean Unused Package Cache" "Cleaning unused package cache failed!"
+        fi
+    elif command -v xbps-remove &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S xbps-remove -o; then
+            notify "Clean Unused Package Cache" "Clean Unused Package Cache done!"
+        else
+            notify_error "Clean Unused Package Cache" "Cleaning unused package cache failed!"
+        fi
+    elif command -v apt-get &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S apt-get clean; then
+            notify "Clean Unused Package Cache" "Clean Unused Package Cache done!"
+        else
+            notify_error "Clean Unused Package Cache" "Cleaning unused package cache failed!"
+        fi
+    fi
+}
+
+# Function to optimize system performance
+optimize_system_performance() {
+    notify "Optimize System Performance" "Optimize System Performance started..."
+    echo "Optimizing system performance..."
+    if echo "$SUDO_PASSWORD" | sudo -S sysctl -w vm.swappiness=10 && echo "vm.swappiness=10" | sudo tee -a /etc/sysctl.d/99-sysctl.conf; then
+        if echo "$SUDO_PASSWORD" | sudo -S systemctl disable bluetooth; then
+            if echo "$SUDO_PASSWORD" | sudo -S systemctl mask systemd-rfkill.service systemd-rfkill.socket; then
+                notify "Optimize System Performance" "Optimize System Performance done!"
+            else
+                notify_error "Optimize System Performance" "Masking rfkill services failed!"
+            fi
+        else
+            notify_error "Optimize System Performance" "Disabling bluetooth service failed!"
+        fi
+    else
+        notify_error "Optimize System Performance" "Setting swappiness failed!"
+    fi
+}
+
+# Function to update mirrors
+update_mirrors() {
+    notify "Update Mirrors" "Update Mirrors started..."
+    echo "Updating mirrors..."
+    if command -v reflector &> /dev/null; then
+        if echo "$SUDO_PASSWORD" | sudo -S reflector --verbose --latest 5 --sort rate --save /etc/pacman.d/mirrorlist; then
+            notify "Update Mirrors" "Update Mirrors done!"
+        else
+            notify_error "Update Mirrors" "Updating mirrors failed!"
+        fi
+    elif command -v xbps-install &> /dev/null; then
+        notify "Update Mirrors" "Void Linux handles mirrors differently, skipping..."
+    elif command -v apt-get &> /dev/null; then
+        notify "Update Mirrors" "Debian handles mirrors differently, skipping..."
+    fi
+}
+
+# Function to check for broken symlinks
+check_broken_symlinks() {
+    notify "Check Broken Symlinks" "Check Broken Symlinks started..."
+    echo "Checking for broken symlinks..."
+    if find / -xtype l -print; then
+        notify "Check Broken Symlinks" "Check Broken Symlinks done!"
+    else
+        notify_error "Check Broken Symlinks" "Checking for broken symlinks failed!"
+    fi
+}
+
+# Function to remove old journal logs
+clean_journal_logs() {
+    notify "Clean Journal Logs" "Clean Journal Logs started..."
+    echo "Cleaning old journal logs..."
+    if echo "$SUDO_PASSWORD" | sudo -S journalctl --vacuum-time=2weeks; then
+        notify "Clean Journal Logs" "Clean Journal Logs done!"
+    else
+        notify_error "Clean Journal Logs" "Cleaning old journal logs failed!"
+    fi
+}
+
+# Function to check file system
+check_filesystem() {
+    notify "Check Filesystem" "Check Filesystem started..."
+    echo "Checking filesystem..."
+    if echo "$SUDO_PASSWORD" | sudo -S fsck -A -y; then
+        notify "Check Filesystem" "Check Filesystem done!"
+    else
+        notify_error "Check Filesystem" "Checking filesystem failed!"
+    fi
+}
+
+# Function to perform full optimization
+full_optimization() {
+    update_system
+    clean_package_cache
+    remove_orphans
+    clean_unused_package_cache
+    optimize_system_performance
+    update_mirrors
+    check_broken_symlinks
+    clean_journal_logs
+    check_filesystem
+}
+
+# Define options
+OPTIONS="Update System\nClean Package Cache\nRemove Orphan Packages\nClean Unused Package Cache\nOptimize System Performance\nUpdate Mirrors\nCheck for Broken Symlinks\nClean Old Journal Logs\nCheck Filesystem\nFull Optimization"
+
+# Display options in dmenu and get user choice
+CHOICE=$(echo -e "$OPTIONS" | dmenu -i -p 'Select an optimization task:')
+
+# Run the selected option
+case "$CHOICE" in
+    "Update System")
+        update_system
+        ;;
+    "Clean Package Cache")
+        clean_package_cache
+        ;;
+    "Remove Orphan Packages")
+        remove_orphans
+        ;;
+    "Clean Unused Package Cache")
+        clean_unused_package_cache
+        ;;
+    "Optimize System Performance")
+        optimize_system_performance
+        ;;
+    "Update Mirrors")
+        update_mirrors
+        ;;
+    "Check for Broken Symlinks")
+        check_broken_symlinks
+        ;;
+    "Clean Old Journal Logs")
+        clean_journal_logs
+        ;;
+    "Check Filesystem")
+        check_filesystem
+        ;;
+    "Full Optimization")
+        full_optimization
+        ;;
+    *)
+        notify_error "Invalid Choice" "No valid option selected. Exiting."
+        ;;
+esac
