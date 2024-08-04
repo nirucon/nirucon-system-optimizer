@@ -11,7 +11,7 @@ exec > >(tee -a "$LOGFILE") 2>&1
 
 # Prompt for sudo password
 get_sudo_password() {
-    SUDO_PASSWORD=$(echo -n | dmenu -p "Enter sudo password: " -fn 'Monospace-20' -nb '#000000' -nf '#FFFFFF' -sb '#3a3d3f' -sf '#FFFFFF')
+    SUDO_PASSWORD=$(echo -n | dmenu -p "Enter sudo password: " -fn 'Monospace-18' -nb '#000000' -nf '#FFFFFF' -sb '#3a3d3f' -sf '#FFFFFF')
     export SUDO_PASSWORD
 }
 
