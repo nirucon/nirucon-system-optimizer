@@ -8,6 +8,9 @@
 LOGFILE="/tmp/nirucon-system-optimizer.log"
 exec > >(tee -a "$LOGFILE") 2>&1
 
+# Print the PATH for debugging
+echo "Current PATH: $PATH"
+
 # Prompt for sudo password
 get_sudo_password() {
     SUDO_PASSWORD=$(echo -n | dmenu -p "Enter sudo password: " -fn 'Monospace-18' -nb '#000000' -nf '#FFFFFF' -sb '#3a3d3f' -sf '#FFFFFF')
@@ -190,7 +193,7 @@ clean_journal_logs() {
 check_filesystem() {
     notify "Check Filesystem" "Check Filesystem started..."
     echo "Checking filesystem..."
-    run_sudo fsck -A -y
+    run_sudo /usr/bin/fsck -A -y
     notify "Check Filesystem" "Check Filesystem done!"
 }
 
@@ -212,50 +215,4 @@ main() {
     detect_distro
     detect_aur_helper
     check_dependencies
-    get_sudo_password
-
-    # Define options
-    OPTIONS="Update System\nClean Package Cache\nRemove Orphan Packages\nClean Unused Package Cache\nOptimize System Performance\nUpdate Mirrors\nCheck for Broken Symlinks\nClean Old Journal Logs\nCheck Filesystem\nFull Optimization"
-
-    # Display options in dmenu and get user choice
-    CHOICE=$(echo -e "$OPTIONS" | dmenu -i -p 'Select an optimization task:')
-
-    # Run the selected option
-    case "$CHOICE" in
-        "Update System")
-            update_system
-            ;;
-        "Clean Package Cache")
-            clean_package_cache
-            ;;
-        "Remove Orphan Packages")
-            remove_orphans
-            ;;
-        "Clean Unused Package Cache")
-            clean_unused_package_cache
-            ;;
-        "Optimize System Performance")
-            optimize_system_performance
-            ;;
-        "Update Mirrors")
-            update_mirrors
-            ;;
-        "Check for Broken Symlinks")
-            check_broken_symlinks
-            ;;
-        "Clean Old Journal Logs")
-            clean_journal_logs
-            ;;
-        "Check Filesystem")
-            check_filesystem
-            ;;
-        "Full Optimization")
-            full_optimization
-            ;;
-        *)
-            notify_error "Invalid Choice" "No valid option selected. Exiting."
-            ;;
-    esac
-}
-
-main
+    get
