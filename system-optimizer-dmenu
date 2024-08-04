@@ -63,7 +63,7 @@ notify_error() {
 
 # Check if required tools are installed
 check_dependencies() {
-    local dependencies=("dmenu" "notify-send" "fsck")
+    local dependencies=("dmenu" "notify-send")
     if [ "$DISTRO" == "arch" ]; then
         dependencies+=("reflector" "paccache")
     fi
@@ -73,6 +73,11 @@ check_dependencies() {
             exit 1
         fi
     done
+    # Check for fsck separately
+    if ! [ -x /usr/bin/fsck ]; then
+        notify_error "Missing Dependency" "Please install fsck"
+        exit 1
+    fi
 }
 
 # Function to update system
@@ -177,7 +182,7 @@ update_mirrors() {
 check_broken_symlinks() {
     notify "Check Broken Symlinks" "Check Broken Symlinks started..."
     echo "Checking for broken symlinks..."
-    find / -xtype l -print || notify_error "Check Broken Symlinks" "Checking for broken symlinks failed!"
+    run_sudo find / -xtype l -print || notify_error "Check Broken Symlinks" "Checking for broken symlinks failed!"
     notify "Check Broken Symlinks" "Check Broken Symlinks done!"
 }
 
